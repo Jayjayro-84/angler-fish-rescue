@@ -1,0 +1,22 @@
+ANGLER FISH RESCUE - putting it on a phone or tablet
+
+The game needs to be on a website once, so the phone can save it as an app.
+After that it works offline, with no internet.
+
+1. On a computer, go to https://app.netlify.com/drop and make a free account.
+2. Drag the whole "angler-fish-rescue-app" folder onto the page.
+3. Netlify gives you a web address (something like https://cheerful-fish-123.netlify.app).
+
+iPhone or iPad
+4. Open that address in Safari.
+5. Tap the Share button, then "Add to Home Screen", then "Add".
+6. Open Spencer from the home screen, turn the phone sideways, turn the sound on.
+
+Android phone or tablet
+4. Open that address in Chrome.
+5. Tap the three dots menu, then "Add to Home screen" or "Install app".
+6. Open Spencer from the home screen.
+
+Open the game once with internet after installing and leave it open for a minute
+(it saves the voices), then it plays offline.
+Progress is saved on each device separately.
