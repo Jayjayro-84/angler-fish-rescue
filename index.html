@@ -2707,7 +2707,7 @@ const wotdWord=()=>{ const pool=WR_ALL.filter(w=>w.length>1); return pool[(today
 let chainTok=0;
 function wsay(who,text,o={}){ ++chainTok; return speak(who,text,o); }
 function sayChain(list,done){ const tok=++chainTok; let i=0;
-  const next=()=>{ if(tok!==chainTok) return; if(i>=list.length){ if(done) done(); return; } const [who,text]=list[i++]; speak(who,text,{onDone:()=>setTimeout(next,90)}); }; next(); }
+  const next=()=>{ if(tok!==chainTok) return; if(i>=list.length){ if(done) done(); return; } const [who,text]=list[i++]; let moved=false; const go=()=>{ if(moved) return; moved=true; clearTimeout(wd); setTimeout(next,90); }; const est=speak(who,text,{onDone:go})||1; const wd=setTimeout(go,(est*1.6+2.5)*1000); }; next(); }
 const shuffle=a=>{ a=[...a]; for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; };
 function packOpen(i){ const W=wrS(), p=WR_PACKS[i]; if(p.id==='n1') return W.name; return i<2||!!W.done[WR_PACKS[i-1].id]||!!W.done[p.id]; }
 function drawSticker(c,pk,x,y,r){
@@ -2794,7 +2794,7 @@ function makeRound(game,w){
   if(game==='grandma'){ rd.miss=(Math.random()*L.length)|0; L.forEach((_,i)=>rd.filled[i]=i!==rd.miss); const ex=distractLetters(w,2); rd.items=shuffle([{ch:L[rd.miss],ok:true},...ex.map(ch=>({ch}))]).map((it,i)=>({...it,kind:['jelly','puffer','crab_awake'][i],used:false,wig:0,fly:null,ph:Math.random()*6})); }
   if(game==='archie'){ const pk=WR_PACKS.find(p=>p.words.includes(w)); let pool=(pk?pk.words:WR_ALL).filter(x=>x!==w); if(pool.length<2) pool=WR_ALL.filter(x=>x!==w); rd.items=shuffle([{t:w,ok:true},...shuffle(pool).slice(0,2).map(t=>({t}))]).map(it=>({...it,used:false,wig:0,fly:null,ph:Math.random()*6})); }
   if(game==='nathan'){ const ex=distractLetters(w,1); rd.items=shuffle([...L.map(ch=>({ch})),...ex.map(ch=>({ch,extra:true}))]).map(it=>({...it,used:false,x:0,y:0,hx:0,hy:0,drag:false,slot:-1})); rd.cross=0; }
-  if(game==='nicole'){ rd.trace=Math.min(L.length,4); rd.mask=null; rd.strokes=[]; rd.cover=0; rd.healed=L.map(()=>false); rd.toldDot=false; }
+  if(game==='nicole'){ rd.trace=Math.min(L.length,4); rd.tr=null; rd.healed=L.map(()=>false); rd.toldDot=false; }
   return rd;
 }
 /* ---- layout ---- */
@@ -2804,17 +2804,18 @@ function wgLayout(){ const w=WG.w, h=WG.h, rd=WG.rd, n=rd.L.length, hasPic=!!rd.
   const sx=(hasPic?picX+ps/2+20+(w-picX-ps/2-20-60-tot)/2:(w-tot)/2), sy=headH*.5-sz/2;
   return {headH,ps,picX,picY:headH*.5,sz,gap,slot:i=>({x:sx+i*(sz+gap),y:sy}),play:{x:20,y:headH+10,w:w-40-(['grandad','grandma','gus','nicole'].includes(WG.game)?Math.min(150,w*.16):0),h:h-headH-20},spk:{x:w-36,y:36,r:26}}; }
 function placeItems(){ const rd=WG.rd, Ly=WG.lay, P=Ly.play, g=WG.game;
-  if(g==='grandad'||g==='gus'){ const tr=Math.min(56,P.h*.2,P.w/10); const pts=scatter(rd.items.length,{x:P.x+tr,y:P.y+tr,w:P.w-tr*2,h:P.h-tr*2},tr*2.6); rd.items.forEach((it,i)=>{ it.x=pts[i].x; it.y=pts[i].y; it.r=tr; }); }
+  if(g==='grandad'||g==='gus'){ const tr=Math.min(46,P.h*.17,P.w/12); const pts=scatter(rd.items.length,{x:P.x+tr*1.4,y:P.y+tr*1.4,w:P.w-tr*2.8,h:P.h-tr*2.8},tr*3.1); rd.items.forEach((it,i)=>{ it.x=pts[i].x; it.y=pts[i].y; it.r=tr; }); }
   if(g==='grandma'||g==='archie'){ const n=rd.items.length; rd.items.forEach((it,i)=>{ it.x=P.x+P.w*(i+.5)/n+(g==='archie'?-P.w*.04:0); it.y=P.y+P.h*.55; it.r=Math.min(P.h*.32,P.w/n*.38); }); if(g==='archie'){ rd.items.forEach((it,i)=>{ it.x=P.x+P.w*.32+P.w*.62*(i+.5)/n; it.r=Math.min(P.h*.26,P.w*.62/n*.42); }); } }
   if(g==='nathan'){ const n=rd.items.length, bs=Math.min(64,P.w/(n+1)-10,P.h*.24); rd.items.forEach((it,i)=>{ if(it.slot>=0) return; it.hx=P.x+P.w*(i+.5)/n; it.hy=P.y+P.h-bs*.75; if(!it.drag){ it.x=it.hx; it.y=it.hy; } it.s=bs; }); rd.bs=bs; }
 }
 function bridgeSlot(i){ const rd=WG.rd, P=WG.lay.play, n=rd.L.length, bs=rd.bs||56, gap=bs*.08, tot=n*bs+(n-1)*gap, x0=P.x+(P.w-tot)/2; return {x:x0+i*(bs+gap)+bs/2,y:P.y+P.h*.42,s:bs,x0,x1:x0+tot}; }
 /* ---- drawing ---- */
+function fillMid(c,txt,x,y){ c.textAlign='center'; c.textBaseline='alphabetic'; const m=c.measureText(txt); const a=m.actualBoundingBoxAscent||0, d=m.actualBoundingBoxDescent||0; c.fillText(txt,x,y+(a-d)/2); }
 function wLetterTile(c,ch,x,y,r,o={}){ c.save(); if(o.alpha!=null) c.globalAlpha=o.alpha;
-  if(!drawArt(c,'letter_pearl',x,y,r*2.3,r*2.3)){ c.fillStyle='#f4f1ff'; c.strokeStyle=OL; c.lineWidth=3; c.beginPath(); c.arc(x,y,r,0,TAU); c.fill(); c.stroke(); }
-  c.font=`700 ${r*1.15}px ${WFONT}`; c.textAlign='center'; c.textBaseline='middle'; c.fillStyle=OL; c.fillText(ch,x,y+r*.06); c.restore(); }
+  if(!drawArt(c,'letter_pearl',x,y,r*2.9,r*2.9)){ c.fillStyle='#f4f1ff'; c.strokeStyle=OL; c.lineWidth=3; c.beginPath(); c.arc(x,y,r,0,TAU); c.fill(); c.stroke(); }
+  c.font=`700 ${r*1.05}px ${WFONT}`; c.fillStyle=OL; fillMid(c,ch,x,y); c.restore(); }
 function wBlock(c,ch,x,y,s,col='#ffd23f'){ c.save(); c.fillStyle=col; c.strokeStyle=OL; c.lineWidth=3; rr(c,x-s/2,y-s/2,s,s,s*.18); c.fill(); c.stroke(); c.fillStyle='rgba(255,255,255,.35)'; rr(c,x-s/2+4,y-s/2+4,s-8,s*.25,s*.1); c.fill();
-  c.font=`700 ${s*.68}px ${WFONT}`; c.textAlign='center'; c.textBaseline='middle'; c.fillStyle=OL; c.fillText(ch,x,y+s*.04); c.restore(); }
+  c.font=`700 ${s*.68}px ${WFONT}`; c.fillStyle=OL; fillMid(c,ch,x,y); c.restore(); }
 function drawSlots(c,o={}){ const rd=WG.rd, Ly=WG.lay, t=WG.t;
   rd.L.forEach((ch,i)=>{ const s=Ly.slot(i), z=Ly.sz; const on=rd.filled[i];
     c.save(); c.fillStyle=on?'#ffd23f':'rgba(6,32,51,.7)'; c.strokeStyle=on?OL:'rgba(255,210,63,.75)'; c.lineWidth=3; if(!on) c.setLineDash([7,5]); rr(c,s.x,s.y,z,z*1.12,z*.18); c.fill(); c.stroke(); c.setLineDash([]);
@@ -2833,7 +2834,7 @@ function renderWords(dt){
   if(!WG||!WG.rd) return; const cvs=WG.cv, rect=cvs.getBoundingClientRect();
   if(!rect.width||!rect.height) return;
   if(Math.abs(rect.width-WG.w)>1||Math.abs(rect.height-WG.h)>1){ WG.w=rect.width; WG.h=rect.height; cvs.width=Math.round(WG.w*DPR); cvs.height=Math.round(WG.h*DPR); WG.lay=null; }
-  if(!WG.lay||WG.lay.rd!==WG.rd){ WG.lay=wgLayout(); WG.lay.rd=WG.rd; placeItems(); if(WG.game==='nicole') nicoleMask(); }
+  if(!WG.lay||WG.lay.rd!==WG.rd){ WG.lay=wgLayout(); WG.lay.rd=WG.rd; placeItems(); if(WG.game==='nicole') nicoleSetup(); }
   const c=WG.c, w=WG.w, h=WG.h, rd=WG.rd, g=WG.game, Ly=WG.lay, P=Ly.play; WG.t+=dt; rd.t+=dt; const t=WG.t;
   c.setTransform(DPR,0,0,DPR,0,0); c.clearRect(0,0,w,h);
   // backdrop per helper
@@ -2864,20 +2865,22 @@ function drawSpellGame(c){ const rd=WG.rd, Ly=WG.lay, P=Ly.play, t=WG.t, dt=1/60
   for(const it of rd.items){ if(it.done) continue; stepFly(it,dt); it.wig=Math.max(0,it.wig-dt*3);
     const x=it.x+Math.sin(it.wig*20)*8*it.wig, y=it.y+(it.fly?0:Math.sin(t*1.6+it.x)*3);
     if(it.used&&!it.fly){ it.done=true; continue; }
-    wLetterTile(c,it.ch,x,y,it.used?Ly.sz*.42:it.r); }
+    wLetterTile(c,it.ch,x,y,it.used?Ly.sz*.34:it.r); }
   if(g==='gus'){ // the dark, with a torch where the finger is
-    const pt=rd.pt||{x:P.x+P.w/2,y:P.y+P.h/2}, rad=Math.min(P.w,P.h)*(rd.done?2:.26);
-    c.save(); c.beginPath(); c.rect(P.x-20,P.y-10,P.w+40,P.h+30); c.arc(pt.x,pt.y,rad,0,TAU,true); c.fillStyle='rgba(2,6,14,.94)'; c.fill();
+    const pt=rd.pt||{x:P.x+P.w/2,y:P.y+P.h/2}, rad=Math.min(P.w,P.h)*.26, fade=rd.done?Math.max(0,1-rd.doneT*1.5):1;
+    if(fade<=0) return;
+    c.save(); c.globalAlpha=fade; c.beginPath(); c.rect(0,P.y-10,WG.w,WG.h-P.y+10); c.clip();
+    c.beginPath(); c.rect(0,P.y-10,WG.w,WG.h-P.y+10); c.arc(pt.x,pt.y,rad,0,TAU); c.fillStyle='rgba(2,6,14,.94)'; c.fill('evenodd');
     const gl=c.createRadialGradient(pt.x,pt.y,rad*.6,pt.x,pt.y,rad); gl.addColorStop(0,'rgba(2,6,14,0)'); gl.addColorStop(1,'rgba(2,6,14,.85)'); c.fillStyle=gl; c.beginPath(); c.arc(pt.x,pt.y,rad,0,TAU); c.fill();
     c.strokeStyle='rgba(255,240,170,.5)'; c.lineWidth=3; c.beginPath(); c.arc(pt.x,pt.y,rad,0,TAU); c.stroke(); c.restore();
-    for(const it of rd.items) if(!it.used&&dist(it.x,it.y,pt.x,pt.y)>rad) { c.fillStyle=`rgba(255,240,170,${.12+.1*Math.sin(t*3+it.x)})`; c.beginPath(); c.arc(it.x,it.y,4,0,TAU); c.fill(); }
+    if(!rd.done) for(const it of rd.items) if(!it.used&&dist(it.x,it.y,pt.x,pt.y)>rad) { c.fillStyle=`rgba(255,240,170,${.12+.1*Math.sin(t*3+it.x)})`; c.beginPath(); c.arc(it.x,it.y,4,0,TAU); c.fill(); }
     if(!rd.pt) label(c,'Drag your finger to shine the light',P.x+P.w/2,P.y+P.h-14,'#fff8e6',18); }
 }
 function drawBonkGame(c){ const rd=WG.rd, Ly=WG.lay, t=WG.t, dt=1/60;
   drawSlots(c,{qmark:rd.filled[rd.miss]?-1:rd.miss});
   for(const it of rd.items){ if(it.done) continue; it.wig=Math.max(0,it.wig-dt*3); stepFly(it,dt);
     if(it.used&&!it.fly){ it.done=true; rd.filled[rd.miss]=true; continue; }
-    if(it.used){ wLetterTile(c,it.ch,it.x,it.y,Ly.sz*.42); continue; }
+    if(it.used){ wLetterTile(c,it.ch,it.x,it.y,Ly.sz*.34); continue; }
     const bx=it.x+Math.sin(t*1.3+it.ph)*14+Math.sin(it.wig*20)*10*it.wig, by=it.y+Math.sin(t*2+it.ph)*10, r=it.r;
     if(it.bonk){ it.bonk-=dt; } const sq=it.bonk>0?1-.3*it.bonk:1;
     c.save(); c.globalAlpha=it.gone?Math.max(0,1-it.gone):1; if(it.gone) it.gone+=dt;
@@ -2917,22 +2920,55 @@ function drawBridgeGame(c){ const rd=WG.rd, Ly=WG.lay, P=Ly.play, t=WG.t, dt=1/6
     wBlock(c,it.ch,it.x,it.y,it.s*(it.drag?1.12:1)); }
 }
 /* tracing: the letter is drawn big; the finger paints over it; enough paint heals it */
-function nicoleMask(){ const rd=WG.rd, P=WG.lay.play, ch=rd.L[rd.cur]; const N=110, oc=document.createElement('canvas'); oc.width=oc.height=N; const x=oc.getContext('2d');
-  const fpx=N*.82; x.font=`700 ${fpx}px ${WFONT}`; x.textAlign='center'; x.textBaseline='alphabetic'; const m=x.measureText(ch); const asc=m.actualBoundingBoxAscent||fpx*.7, des=m.actualBoundingBoxDescent||0; const y0=(N+asc-des)/2; x.fillText(ch,N/2,y0);
-  const d=x.getImageData(0,0,N,N).data, pts=[]; for(let j=0;j<N;j+=2) for(let i=0;i<N;i+=2) if(d[(j*N+i)*4+3]>140) pts.push({i,j,on:false});
-  const S2=Math.min(P.w*.6,P.h*.98), k=S2/N, ox=P.x+(P.w-S2)/2, oy=P.y+(P.h-S2)/2; let st=pts[0]; for(const p of pts) if(p.j*1+p.i*.35<st.j*1+st.i*.35) st=p;
-  rd.mask={N,pts,fpx,y0,k,ox,oy,start:st,ch}; rd.strokes=[]; rd.cover=0; }
-function traceAdd(px,py){ const rd=WG.rd, M=rd.mask; if(!M) return; const mx=(px-M.ox)/M.k, my=(py-M.oy)/M.k, rb=M.N*.1; let on=0;
-  for(const p of M.pts){ if(!p.on&&Math.abs(p.i-mx)<rb&&Math.abs(p.j-my)<rb&&(p.i-mx)**2+(p.j-my)**2<rb*rb) p.on=true; if(p.on) on++; }
-  rd.cover=on/M.pts.length; }
-function drawTraceGame(c){ const rd=WG.rd, M=rd.mask, t=WG.t; drawSlots(c,{hurt:true}); if(!M||rd.done) return;
-  c.save(); c.font=`700 ${M.fpx*M.k}px ${WFONT}`; c.textAlign='center'; c.textBaseline='alphabetic'; c.lineJoin='round';
-  c.fillStyle='rgba(255,255,255,.55)'; c.strokeStyle='rgba(120,40,80,.55)'; c.lineWidth=3; c.setLineDash([8,6]); c.fillText(M.ch,M.ox+M.N/2*M.k,M.oy+M.y0*M.k); c.strokeText(M.ch,M.ox+M.N/2*M.k,M.oy+M.y0*M.k); c.setLineDash([]); c.restore();
-  // paint, clipped to near the letter
-  c.save(); c.strokeStyle='rgba(255,111,145,.85)'; c.lineWidth=M.N*.2*M.k; c.lineCap='round'; c.lineJoin='round';
-  for(const s of rd.strokes){ c.beginPath(); s.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y)); if(s.length===1) c.lineTo(s[0].x+.1,s[0].y); c.stroke(); } c.restore();
-  if(!rd.strokes.length){ const sp=M.start, x=M.ox+sp.i*M.k, y=M.oy+sp.j*M.k, r=12+3*Math.sin(t*5); c.fillStyle='#3fae4a'; c.strokeStyle=OL; c.lineWidth=3; c.beginPath(); c.arc(x,y,r,0,TAU); c.fill(); c.stroke(); }
-  const P=WG.lay.play, bw=Math.min(220,P.w*.4); c.fillStyle='rgba(0,0,0,.25)'; rr(c,P.x+(P.w-bw)/2,P.y+P.h-10,bw,12,6); c.fill(); c.fillStyle='#ff6f91'; rr(c,P.x+(P.w-bw)/2,P.y+P.h-10,bw*Math.min(1,rd.cover/.72),12,6); c.fill();
+/* tracing: each letter is a set of strokes (unit box: x 0..1, baseline y .72, x-height .36, ascender .04, descender .98).
+   The finger has to follow each stroke from its green dot, in order, to fill it in. */
+const TA=(cx,cy,rx,ry,a0,a1)=>{ const n=Math.max(6,Math.ceil(Math.abs(a1-a0)/10)), o=[]; for(let i=0;i<=n;i++){ const a=(a0+(a1-a0)*i/n)*Math.PI/180; o.push([cx+Math.cos(a)*rx,cy+Math.sin(a)*ry]); } return o; };
+const BOWL=TA(.48,.54,.2,.18,-20,-380);
+const TRACE={
+ a:[BOWL,[[.68,.36],[.68,.72]]], b:[[[.3,.04],[.3,.72]],TA(.5,.54,.2,.18,180,540)], c:[TA(.52,.54,.2,.18,-35,-325)],
+ d:[BOWL,[[.68,.04],[.68,.72]]], e:[[[.3,.54],[.7,.54],...TA(.5,.54,.2,.18,0,-320)]],
+ f:[[[.66,.1],[.58,.04],[.5,.05],[.45,.12],[.45,.72]],[[.3,.36],[.64,.36]]],
+ g:[BOWL,[[.68,.36],[.68,.86],...TA(.48,.86,.2,.12,0,150)]], h:[[[.3,.04],[.3,.72]],[...TA(.5,.52,.2,.16,180,360),[.7,.72]]],
+ i:[[[.5,.36],[.5,.72]],[[.5,.2]]], j:[[[.56,.36],[.56,.86],...TA(.42,.86,.14,.12,0,160)],[[.56,.2]]],
+ k:[[[.32,.04],[.32,.72]],[[.68,.36],[.32,.58],[.7,.72]]], l:[[[.5,.04],[.5,.72]]],
+ m:[[[.2,.36],[.2,.72]],[...TA(.35,.52,.15,.16,180,360),[.5,.72]],[...TA(.65,.52,.15,.16,180,360),[.8,.72]]],
+ n:[[[.3,.36],[.3,.72]],[...TA(.5,.52,.2,.16,180,360),[.7,.72]]], o:[TA(.5,.54,.2,.18,-90,-450)],
+ p:[[[.3,.36],[.3,.98]],TA(.5,.54,.2,.18,180,540)], q:[BOWL,[[.68,.36],[.68,.98]]], r:[[[.36,.36],[.36,.72]],TA(.54,.52,.18,.16,180,290)],
+ s:[[[.68,.4],[.56,.36],[.42,.36],[.32,.42],[.36,.51],[.5,.55],[.63,.58],[.69,.65],[.6,.71],[.45,.72],[.3,.68]]],
+ t:[[[.5,.12],[.5,.72]],[[.32,.36],[.68,.36]]], u:[[[.3,.36],...TA(.5,.56,.2,.16,180,0)],[[.7,.36],[.7,.72]]],
+ v:[[[.28,.36],[.5,.72],[.72,.36]]], w:[[[.16,.36],[.31,.72],[.5,.46],[.69,.72],[.84,.36]]],
+ x:[[[.3,.36],[.7,.72]],[[.7,.36],[.3,.72]]], y:[[[.3,.36],[.5,.72]],[[.7,.36],[.4,.98]]], z:[[[.3,.36],[.7,.36],[.3,.72],[.7,.72]]],
+ I:[[[.5,.04],[.5,.72]]], A:[[[.5,.04],[.24,.72]],[[.5,.04],[.76,.72]],[[.34,.48],[.66,.48]]],
+ S:[[[.7,.13],[.56,.05],[.4,.06],[.3,.16],[.34,.29],[.5,.37],[.65,.44],[.72,.56],[.64,.68],[.48,.72],[.3,.66]]],
+ G:[[...TA(.5,.38,.25,.34,-40,-330),[.76,.46],[.56,.46]]],
+};
+function resample(pts,step){ if(pts.length===1) return [pts[0]]; const o=[pts[0]]; let carry=0;
+  for(let i=1;i<pts.length;i++){ const [x0,y0]=pts[i-1],[x1,y1]=pts[i], d=Math.hypot(x1-x0,y1-y0); let t=step-carry;
+    while(t<=d){ o.push([x0+(x1-x0)*t/d,y0+(y1-y0)*t/d]); t+=step; } carry=d-(t-step); }
+  const last=pts[pts.length-1], pl=o[o.length-1]; if(Math.hypot(last[0]-pl[0],last[1]-pl[1])>step*.3) o.push(last); return o; }
+function nicoleSetup(){ const rd=WG.rd, P=WG.lay.play, ch=rd.L[rd.cur], key=TRACE[ch]?ch:ch.toLowerCase();
+  const strokes=(TRACE[key]||TRACE.o).map(st=>resample(st,.03));
+  const S2=Math.min(P.w*.62,P.h*1.02), ox=P.x+(P.w-S2)/2, oy=P.y+(P.h-S2)/2-S2*.02;
+  rd.tr={strokes,si:0,ci:0,S:S2,ox,oy,ch,total:strokes.reduce((a,s)=>a+s.length,0),told:false}; }
+const trPt=(T,p)=>({x:T.ox+p[0]*T.S,y:T.oy+p[1]*T.S});
+function traceAdd(px,py){ const rd=WG.rd, T=rd.tr; if(!T||rd.done) return;
+  const st=T.strokes[T.si]; if(!st) return; const tol=T.S*.1;
+  for(let j=Math.min(st.length-1,T.ci+4);j>=T.ci;j--){ const q=trPt(T,st[j]); if(Math.hypot(px-q.x,py-q.y)<tol*(j===T.ci?1.25:1)){ T.ci=j+1; if(T.ci%4===0) SFX.pearl(0); break; } }
+  if(T.ci>=st.length){ T.si++; T.ci=0; SFX.heal(); if(T.si>=T.strokes.length) setTimeout(traceDone,150); } }
+const trDone=T=>T.strokes.slice(0,T.si).reduce((a,s)=>a+s.length,0)+T.ci;
+function drawTraceGame(c){ const rd=WG.rd, T=rd.tr, t=WG.t; drawSlots(c,{hurt:true}); if(!T||rd.done) return;
+  const lw=T.S*.12, path=(pts)=>{ c.beginPath(); pts.forEach((p,i)=>{ const q=trPt(T,p); i?c.lineTo(q.x,q.y):c.moveTo(q.x,q.y); }); if(pts.length===1){ const q=trPt(T,pts[0]); c.lineTo(q.x+.01,q.y); } };
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  for(const st of T.strokes){ path(st); c.strokeStyle='rgba(120,40,80,.5)'; c.lineWidth=lw+6; c.stroke(); c.strokeStyle='rgba(255,255,255,.85)'; c.lineWidth=lw; c.stroke(); }
+  c.setLineDash([3,9]); c.strokeStyle='rgba(120,40,80,.45)'; c.lineWidth=3; for(const st of T.strokes){ path(st); c.stroke(); } c.setLineDash([]);
+  c.strokeStyle='#ff6f91'; c.lineWidth=lw*.92;
+  T.strokes.forEach((st,i)=>{ if(i<T.si){ path(st); c.stroke(); } else if(i===T.si&&T.ci>0){ path(st.slice(0,T.ci)); c.stroke(); } });
+  c.restore();
+  const st=T.strokes[T.si]; if(st){ const cur=trPt(T,st[Math.min(T.ci,st.length-1)]), nx=trPt(T,st[Math.min(T.ci+3,st.length-1)]);
+    const a=Math.atan2(nx.y-cur.y,nx.x-cur.x), r=T.S*.055+2*Math.sin(t*6);
+    if(st.length>1&&dist(cur.x,cur.y,nx.x,nx.y)>2){ c.save(); c.translate(cur.x,cur.y); c.rotate(a); c.fillStyle='rgba(63,174,74,.75)'; c.beginPath(); c.moveTo(r*2.6,0); c.lineTo(r*1.3,-r*.8); c.lineTo(r*1.3,r*.8); c.closePath(); c.fill(); c.restore(); }
+    c.fillStyle='#3fae4a'; c.strokeStyle=OL; c.lineWidth=3; c.beginPath(); c.arc(cur.x,cur.y,r,0,TAU); c.fill(); c.stroke(); }
+  const P=WG.lay.play, bw=Math.min(220,P.w*.4); c.fillStyle='rgba(0,0,0,.25)'; rr(c,P.x+(P.w-bw)/2,P.y+P.h-8,bw,10,5); c.fill(); c.fillStyle='#ff6f91'; rr(c,P.x+(P.w-bw)/2,P.y+P.h-8,bw*trDone(T)/T.total,10,5); c.fill();
 }
 /* ---- input ---- */
 function wgPoint(e){ const r=WG.cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
@@ -2946,18 +2982,18 @@ $('#wgCv').addEventListener('pointerdown',e=>{ if(mode!=='words'||!WG||!WG.rd||!
   if(g==='grandma'){ const it=rd.items.find(x=>!x.used&&!x.gone&&dist(p.x,p.y,x.x,x.y-x.r*.3)<x.r*1.1); if(it) bonkTap(it); }
   if(g==='archie'){ const it=rd.items.find(x=>!x.used&&Math.abs(p.x-x.x)<x.r*1.35&&Math.abs(p.y-x.y)<x.r*.85); if(it) munchTap(it); }
   if(g==='nathan'){ const it=rd.items.find(x=>x.slot<0&&Math.abs(p.x-x.x)<x.s*.6&&Math.abs(p.y-x.y)<x.s*.6); if(it){ it.drag=true; it.moved=false; it.dx=it.x-p.x; it.dy=it.y-p.y; it.sx=p.x; it.sy=p.y; rd.dragIt=it; SFX.tap(); } }
-  if(g==='nicole'&&rd.mask){ const M=rd.mask, sp=M.start; if(!rd.strokes.length&&!rd.toldDot&&dist(p.x,p.y,M.ox+sp.i*M.k,M.oy+sp.j*M.k)>M.N*.3*M.k){ rd.toldDot=true; wsay('nicole','Start at the green dot.'); } rd.strokes.push([p]); traceAdd(p.x,p.y); }
+  if(g==='nicole'&&rd.tr){ const T=rd.tr, st=T.strokes[T.si]; if(st){ const q=trPt(T,st[Math.min(T.ci,st.length-1)]); if(dist(p.x,p.y,q.x,q.y)>T.S*.2&&!T.told){ T.told=true; wsay('nicole','Start at the green dot.'); } } traceAdd(p.x,p.y); rd.lastP=p; }
 });
 $('#wgCv').addEventListener('pointermove',e=>{ if(mode!=='words'||!WG||!WG.rd||!wgDown) return; const p=wgPoint(e), rd=WG.rd, g=WG.game; if(rd.done) return;
   if(g==='gus'){ rd.pt=p; const it=hitLetter(p,true); if(it&&it.word&&it.ch===rd.L[rd.got]) spellTap(it); }
   if(g==='nathan'&&rd.dragIt){ const it=rd.dragIt; it.x=p.x+it.dx; it.y=p.y+it.dy; if(dist(p.x,p.y,it.sx,it.sy)>12) it.moved=true; }
-  if(g==='nicole'&&rd.strokes.length){ const s=rd.strokes[rd.strokes.length-1], q=s[s.length-1]; if(dist(p.x,p.y,q.x,q.y)>3){ s.push(p); const n=Math.ceil(dist(p.x,p.y,q.x,q.y)/6); for(let k=1;k<=n;k++) traceAdd(q.x+(p.x-q.x)*k/n,q.y+(p.y-q.y)*k/n); if(rd.cover>=.72) traceDone(); } }
+  if(g==='nicole'&&rd.tr&&rd.lastP){ const q=rd.lastP, n=Math.max(1,Math.ceil(dist(p.x,p.y,q.x,q.y)/5)); for(let k=1;k<=n;k++) traceAdd(q.x+(p.x-q.x)*k/n,q.y+(p.y-q.y)*k/n); rd.lastP=p; }
 });
 window.addEventListener('pointerup',()=>{ if(!wgDown) return; wgDown=false; if(!WG||!WG.rd) return; const rd=WG.rd;
   if(WG.game==='nathan'&&rd.dragIt){ const it=rd.dragIt; rd.dragIt=null; it.drag=false; bridgeDrop(it); }
-  if(WG.game==='nicole'&&rd.mask&&rd.cover>=.72) traceDone(); });
+  if(WG.game==='nicole') rd.lastP=null; });
 }
-function hitLetter(p,quiet){ const rd=WG.rd; let best=null,bd=1e9; for(const it of rd.items){ if(it.used) continue; const d=dist(p.x,p.y,it.x,it.y); if(d<it.r*1.15&&d<bd){ bd=d; best=it; } }
+function hitLetter(p,quiet){ const rd=WG.rd; let best=null,bd=1e9; for(const it of rd.items){ if(it.used) continue; const d=dist(p.x,p.y,it.x,it.y); if(d<it.r*1.4&&d<bd){ bd=d; best=it; } }
   if(best&&WG.game==='gus'){ const pt=rd.pt, rad=Math.min(WG.lay.play.w,WG.lay.play.h)*.26; if(dist(best.x,best.y,pt.x,pt.y)>rad) return null; } return best; }
 let wBadT=0;
 function wBad(it){ const rd=WG.rd; if(it) it.wig=1; SFX.nope(); if(!rd.wrong&&!WG.missSaid&&WG.list.length>1){ /* first slip this round */ }
@@ -2979,9 +3015,9 @@ function bridgeDrop(it){ const rd=WG.rd; let target=-1;
   else { target=rd.L.findIndex((ch,i)=>!rd.items.some(x=>x.slot===i)); if(target<0||rd.L[target]!==it.ch){ wBad(); return; } }
   it.slot=target; rd.filled[target]=true; wGood(it.ch); SFX.bonk();
   if(rd.L.every((_,i)=>rd.items.some(x=>x.slot===i))) setTimeout(()=>roundWin(),400); }
-function traceDone(){ const rd=WG.rd; if(rd.done||!rd.mask) return; rd.filled[rd.cur]=true; SFX.heal(); const s=WG.lay.slot(rd.cur); WG.fx.push({txt:'♥',x:s.x+WG.lay.sz/2,y:s.y,t:0,col:'#ff8fb1',size:34});
-  rd.cur++; if(rd.cur>=rd.trace){ rd.L.forEach((_,i)=>rd.filled[i]=true); rd.mask=null; setTimeout(()=>roundWin(),300); return; }
-  nicoleMask(); sayChain([['narrator','Trace the letter'],['narrator',rd.L[rd.cur].toLowerCase()]]); }
+function traceDone(){ const rd=WG.rd; if(!WG||rd.done||!rd.tr||rd.tr.si<rd.tr.strokes.length) return; rd.filled[rd.cur]=true; SFX.heal(); const s=WG.lay.slot(rd.cur); WG.fx.push({txt:'♥',x:s.x+WG.lay.sz/2,y:s.y,t:0,col:'#ff8fb1',size:34});
+  rd.cur++; if(rd.cur>=rd.trace){ rd.L.forEach((_,i)=>rd.filled[i]=true); rd.tr=null; setTimeout(()=>roundWin(),300); return; }
+  nicoleSetup(); sayChain([['narrator','Trace the letter'],['narrator',rd.L[rd.cur].toLowerCase()]]); }
 function roundWin(){ if(!WG||!WG.rd||WG.rd.done) return; const rd=WG.rd, W=wrS(), w=rd.w; rd.done=true; rd.doneT=0; rd.L.forEach((_,i)=>rd.filled[i]=true);
   SFX.rescue(); const clean=!rd.wrong; if(clean){ WG.first++; WG.pearls++; }
   if(WG.o.pack){ const j=W.miss.indexOf(w); if(clean&&j>=0) W.miss.splice(j,1); if(!clean&&j<0){ W.miss.push(w); if(W.miss.length>12) W.miss.shift(); } }
@@ -2993,7 +3029,8 @@ function roundWin(){ if(!WG||!WG.rd||WG.rd.done) return; const rd=WG.rd, W=wrS()
   else if(!clean&&WG.o.pack) L.push(['narrator',"We'll try that word again soon."]);
   else { const sent=WR_SENT.filter(s2=>new RegExp('\\b'+w+'\\b',w==='I'?'':'i').test(s2)); if(sent.length&&Math.random()<.6) L.push(['narrator',sent[(Math.random()*sent.length)|0]]); else L.push([WG.game,WG.gd.good]); }
   save(); const t0=performance.now();
-  sayChain(L,()=>setTimeout(()=>{ if(WG&&WG.rd===rd) nextRound(); },Math.max(300,1400-(performance.now()-t0)))); }
+  const go=()=>{ if(WG&&WG.rd===rd&&!rd.moved){ rd.moved=true; nextRound(); } };
+  sayChain(L,()=>setTimeout(go,Math.max(300,1400-(performance.now()-t0)))); setTimeout(go,2500+L.length*2600); }
 function endWords(){ const W=wrS(), o=WG.o, n=WG.list.length; let stars=WG.first>=n?3:WG.first>=Math.ceil(n*.6)?2:1, newStk=false; const lines=[];
   let pearls=WG.pearls;
   if(o.name){ W.name=true; pearls+=5; if(S.tank&&S.tank.v===2&&!S.tank.spec.includes('namesign')){ S.tank.spec.push('namesign'); placeNew('namesign'); } lines.push(['narrator',"You can spell Spencer! Here's a sign for your tank!"]); }
